@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2FA &amp; TOTP 测试</title>
+  <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.0.1/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    main {
+      max-width: 768px;
+      margin: 0 auto;
+      padding: 2em 1em;
+    }
+
+    .code {
+      display: inline-block;
+      border: 2px solid #aaa;
+      font-size: 3em;
+      padding: 0 .5em;
+      border-radius: .1em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="text-center mb-4">2FA &amp; TOTP 测试</h1>
+    <div>
+      <p class="text-center"><img src="assets/qr.png"></p>
+      <p class="text-center">请使用谷歌身份验证器扫描以上二维码</p>
+    </div>
+    <div class="mb-3"><input value="otpauth://totp/Passkou?secret=6shyg3uens2sh5slhey3dmh47skvgq5y&issuer=Test" readonly class="form-control text-center"></div>
+    <div class="text-center mb-4" id="code-box">
+      <span class="code">-</span>
+      <span class="code">-</span>
+      <span class="code">-</span>
+      <span class="code">-</span>
+      <span class="code">-</span>
+      <span class="code">-</span>
+    </div>
+    <div class="progress">
+      <div class="progress-bar" id="progress"></div>
+    </div>
+    <div class="text-center mt-2">系统时间：<span id="time"></span></div>
+    <footer class="text-center mt-2">
+      <a href="https://github.com/Passkou/2fa-test" target="_blank">GitHub</a>
+      <a href="https://www.passkou.com/articles/22/" target="_blank">原理说明</a>
+    </footer>
+  </main>
+  <script src="lib/base32-decode.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script>
+
+    $('#time').html(new Date().toLocaleString())
+    
+    setInterval(() => {
+      const nextT = Math.ceil(Date.now() / 1000 / 30) * 30000
+      const ts = Date.now()
+
+      let progress = 100 - (((nextT - ts) / 30000) * 100);
+
+      updateCode()
+
+      if (progress > 100) {
+        progress = 0;
+      }
+
+      $('#time').html(new Date().toLocaleString())
+
+      $('#progress').css('width', `${progress}%`)
+    }, 500);
+
+    // 时间戳计数器
+    
+    function updateCode() {
+      const T = Math.floor(Date.now() / 1000 / 30)
+      // 用户密钥
+      const K = arrayToBinary(Array.from(new Uint8Array(base32Decode('6shyg3uens2sh5slhey3dmh47skvgq5y'.toUpperCase(), 'RFC4648'))))
+
+      /**
+      * 数字转 Int64 字节流
+      * @param {number} num 
+      * @returns 
+      */
+      function intToBytes(num) {
+        const bytes = [];
+
+        for (let i = 7; i >= 0; i--) {
+          bytes[i] = num & 255;
+          num = num >> 8;
+        }
+
+        return bytes;
+      }
+
+      /**
+       * @param {string} binaryStr
+       */
+      function binaryToArray(binaryStr) {
+        return binaryStr.split('').map(char => char.charCodeAt())
+      }
+
+      function arrayToBinary(array) {
+        return array.map(char => String.fromCodePoint(char)).join('')
+      }
+
+      function arrayToHex(array) {
+        return array.map(char => char.toString(16)).join('')
+      }
+
+      const T1 = arrayToBinary(intToBytes(T))
+      
+      // 计算 HMAC-SHA1，密钥为 K，消息为 T
+      const HS = binaryToArray(CryptoJS.HmacSHA1(CryptoJS.enc.Latin1.parse(T1), CryptoJS.enc.Latin1.parse(K)).toString(CryptoJS.enc.Latin1))
+
+      // 取出最后个字节的低 4 位
+      const offset = HS[19] & 0xf
+
+      // 将从 offset 开始的四个字节按大端组装为整数
+      let bytes = (HS[offset] & 0x7f /** 这里是为了忽略符号位 */) << 24
+        | HS[offset + 1] << 16
+        | HS[offset + 2] << 8
+        | HS[offset + 3]
+
+      // 整数转字符串，然后取出后六位
+      let code = bytes.toString().slice(-6);
+
+      // 不足 6 位数则补 0
+      for (let i = 0; i > 6 - code.length; i++) {
+        code = '0' + code;
+      }
+
+      code.split('').forEach((c, i) => {
+        $("#code-box").children()[i].innerHTML = c
+      })
+    }
+
+    updateCode()
+  </script>
+  </body>
+</html>

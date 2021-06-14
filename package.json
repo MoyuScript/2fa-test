@@ -1,0 +1,14 @@
+{
+  "name": "2fa-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:Passkou/2fa-test.git",
+  "author": "Passkou <passkou@163.com>",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "base32-decode": "^1.0.0",
+    "base32-encode": "^1.2.0",
+    "crypto-js": "^4.0.0"
+  }
+}
